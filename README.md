@@ -16,17 +16,26 @@ npm install -g env-all
 # 1. Initialize the global store
 envall init
 
-# 2. Add your keys (hidden input, not saved to shell history)
+# 2. Open the browser UI to add your keys
+envall ui
+```
+
+This opens a split-screen editor with your global key store on the left and the current project's `.env` on the right. Add keys, copy values between sides, and manage everything visually.
+
+### Alternative: CLI only
+
+```bash
+# Add keys from the terminal (hidden input, not saved to shell history)
 envall set OPENAI_API_KEY
 envall set STRIPE_SECRET_KEY
 envall set DATABASE_URL
 
-# 3. In any project directory, pull what you need
+# In any project directory, pull what you need
 cd ~/my-project
 envall pull OPENAI_API_KEY STRIPE_SECRET_KEY DATABASE_URL
 ```
 
-That's it. Your project's `.env` now has the keys. envall also adds `.env` to your `.gitignore` automatically.
+Either way, envall adds `.env` to your `.gitignore` automatically.
 
 ---
 
