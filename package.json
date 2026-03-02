@@ -1,0 +1,32 @@
+{
+  "name": "env-all",
+  "version": "0.1.1",
+  "description": "Cross-project environment variable manager — store API keys once, use everywhere",
+  "type": "module",
+  "bin": {
+    "envall": "./bin/cli.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin/",
+    "src/"
+  ],
+  "keywords": [
+    "env",
+    "environment",
+    "dotenv",
+    "api-keys",
+    "global"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/perelmanai/env-all.git"
+  },
+  "homepage": "https://github.com/perelmanai/env-all",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^13.1.0"
+  }
+}
