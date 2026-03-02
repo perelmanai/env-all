@@ -17,7 +17,7 @@ npm install -g env-all
 ```bash
 # Create the skill directory
 mkdir -p ~/.claude/skills/env
-# Copy SKILL.md from this repo
+# Copy SKILL.md from this repo to the skill directory
 cp SKILL.md ~/.claude/skills/env/SKILL.md
 ```
 
