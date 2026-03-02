@@ -1,6 +1,6 @@
 {
   "name": "env-all",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Cross-project environment variable manager — store API keys once, use everywhere",
   "type": "module",
   "bin": {
