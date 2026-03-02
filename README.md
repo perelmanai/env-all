@@ -15,11 +15,13 @@ npm install -g env-all
 ### With Claude Code Skill
 
 ```bash
+# Create the skill directory
 mkdir -p ~/.claude/skills/env
-cp skill.md ~/.claude/skills/env/SKILL.md
+# Copy SKILL.md from this repo
+cp SKILL.md ~/.claude/skills/env/SKILL.md
 ```
 
-Then use it by typing /env in Claude Code in any project. Claude will install env-all, scan your project for required env vars, and pull them from your global store automatically.
+Then use it by typing `/env` in Claude Code in any project. Claude will install env-all, scan your project for required env vars, and pull them from your global store automatically.
 
 ### With simple UI
 

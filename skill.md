@@ -1,6 +1,6 @@
 ---
 name: env
-description: Sync global environment variables into this project. Use when setting up .env files, pulling API keys, or configuring environment variables for a project.
+description: Sync environment variables in ~/.env-all/.env into this project. Use when setting up .env files, pulling API keys, or configuring environment variables for a project.
 ---
 
 # /env — Sync global environment variables into this project
