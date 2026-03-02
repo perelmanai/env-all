@@ -12,21 +12,19 @@ npm install -g env-all
 
 ## Quick Start
 
-### With Claude Code (recommended)
+### With Claude Code Skill
+
+```bash
+mkdir -p ~/.claude/skills/env
+cp skill.md ~/.claude/skills/env/SKILL.md
+```
+
+Then use it by typing /env in Claude Code in any project. Claude will install env-all, scan your project for required env vars, and pull them from your global store automatically.
+
+### With simple UI
 
 ```bash
 npm install -g env-all
-envall init
-envall ui  # add your keys in the browser
-```
-
-Then in any project, run `/env` in Claude Code. It scans your project, matches the env vars it needs to your global store, and pulls them automatically -- without ever seeing the actual values.
-
-Copy [`skill.md`](skill.md) to `~/.claude/skills/env/SKILL.md` to install the skill.
-
-### With the browser UI
-
-```bash
 envall init
 envall ui
 ```
@@ -36,6 +34,7 @@ This opens a split-screen editor with your global key store on the left and the 
 ### CLI only
 
 ```bash
+npm install -g env-all
 envall init
 
 # Add keys from the terminal (hidden input, not saved to shell history)
@@ -48,7 +47,7 @@ cd ~/my-project
 envall pull OPENAI_API_KEY STRIPE_SECRET_KEY DATABASE_URL
 ```
 
-Either way, envall adds `.env` to your `.gitignore` automatically.
+Either way, env-all adds `.env` to your `.gitignore` automatically.
 
 ---
 
@@ -142,7 +141,7 @@ The agent never sees your secrets. See the [AI Assistant Integration](#ai-assist
 
 ### Conflict handling
 
-When a key already exists in your project `.env` with a different value, envall prompts you:
+When a key already exists in your project `.env` with a different value, env-all prompts you:
 
 ```
 Conflict: OPENAI_API_KEY
@@ -179,13 +178,11 @@ envall ui
 
 Opens a split-screen editor in your browser with your global store on the left and the current project's `.env` on the right. Copy values to clipboard and paste where needed -- the same flow as copying keys from an API provider dashboard.
 
-Supports light and dark mode automatically.
-
 ---
 
 ## AI Assistant Integration
 
-envall is designed so AI coding assistants (Claude Code, Cursor, etc.) can set up project env vars without ever reading your actual keys.
+env-all is designed so AI coding assistants (Claude Code, Cursor, etc.) can set up project env vars without ever reading your actual keys.
 
 ### How it works
 
@@ -209,7 +206,7 @@ Then run `/env` in any project to have Claude scan your code, generate a `.env-p
 <details>
 <summary><strong>How .env.available works</strong></summary>
 
-Every time you modify the store (`set`, `rm`, `open`), envall regenerates `~/.env-global/.env.available`. This file contains one key name per line:
+Every time you modify the store (`set`, `rm`, `open`), env-all regenerates `~/.env-global/.env.available`. This file contains one key name per line:
 
 ```
 OPENAI_API_KEY
@@ -236,7 +233,7 @@ It's also regenerated at the start of `pull` and `status`, so manual edits to `~
 - Profile names are validated to prevent path traversal.
 - `.env` is added to `.gitignore` automatically on pull.
 
-envall stores keys unencrypted, the same as any `.env` file. It is designed for local development, not production secret management.
+env-all stores keys unencrypted, the same as any `.env` file. It is designed for local development, not production secret management.
 
 </details>
 
