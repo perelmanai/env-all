@@ -1,8 +1,8 @@
-# envall
+# env-all
 
 **Store your API keys once. Use them in every project.**
 
-Tired of copying the same `OPENAI_API_KEY` into every new project's `.env`? envall keeps all your keys in one place (`~/.env-global/.env`) and lets you pull them into any project with a single command.
+Tired of copying the same `OPENAI_API_KEY` into every new project's `.env`? env-all keeps all your keys in one place (`~/.env-global/.env`) and lets you pull them into any project with a single command.
 
 ```
 npm install -g env-all
@@ -12,17 +12,28 @@ npm install -g env-all
 
 ## Quick Start
 
-```bash
-# 1. Initialize the global store
-envall init
+### With Claude Code (recommended)
 
-# 2. Open the browser UI to add your keys
+```bash
+npm install -g env-all
+envall init
+envall ui  # add your keys in the browser
+```
+
+Then in any project, run `/env` in Claude Code. It scans your project, matches the env vars it needs to your global store, and pulls them automatically -- without ever seeing the actual values.
+
+Copy [`skill.md`](skill.md) to `~/.claude/skills/env/SKILL.md` to install the skill.
+
+### With the browser UI
+
+```bash
+envall init
 envall ui
 ```
 
 This opens a split-screen editor with your global key store on the left and the current project's `.env` on the right. Add keys, copy values between sides, and manage everything visually.
 
-### Alternative: CLI only
+### CLI only
 
 ```bash
 envall init
@@ -45,7 +56,7 @@ Either way, envall adds `.env` to your `.gitignore` automatically.
 
 - **One source of truth.** Stop maintaining the same keys across 15 projects.
 - **Rename on pull.** `envall pull OPENAI_API_KEY:VITE_OPENAI_API_KEY` handles framework prefixes.
-- **AI-friendly.** Designed so AI coding assistants can pull keys into projects without ever seeing the actual values (via `.env.available`).
+- **AI-friendly.** AI coding assistants can scan your project, generate a `.env-pull.json` mapping, and pull keys automatically -- without ever seeing the actual values.
 - **Zero dependencies.** Just `commander` for CLI parsing. No runtime overhead in your projects.
 - **Browser UI.** `envall ui` opens a split-screen editor showing your global keys alongside the current project's `.env`.
 
@@ -184,19 +195,16 @@ envall is designed so AI coding assistants (Claude Code, Cursor, etc.) can set u
 4. The AI writes a `.env-pull.json` mapping and runs `envall pull .env-pull.json`.
 5. The AI never sees `~/.env-global/.env` or any actual values.
 
-### Claude Code slash command
+### Claude Code skill
 
-If you use Claude Code, create a skill at `~/.claude/commands/env.md` that instructs Claude to:
+Copy [`skill.md`](skill.md) to `~/.claude/skills/env/SKILL.md`:
 
-1. Check `which envall`, install if missing
-2. Scan project source for `process.env.*`, `import.meta.env.*`, SDK imports
-3. Read `~/.env-global/.env.available`
-4. Write `.env-pull.json` with the right mappings
-5. Run `envall pull .env-pull.json --skip`
+```bash
+mkdir -p ~/.claude/skills/env
+cp skill.md ~/.claude/skills/env/SKILL.md
+```
 
-Then run `/env` in any project to have Claude generate and pull the mappings automatically.
-
-See the [example skill](https://github.com/perelmanai/env-all/wiki/Claude-Code-Skill) for a ready-to-use template.
+Then run `/env` in any project to have Claude scan your code, generate a `.env-pull.json` mapping, and pull keys automatically.
 
 <details>
 <summary><strong>How .env.available works</strong></summary>
