@@ -25,6 +25,8 @@ This opens a split-screen editor with your global key store on the left and the 
 ### Alternative: CLI only
 
 ```bash
+envall init
+
 # Add keys from the terminal (hidden input, not saved to shell history)
 envall set OPENAI_API_KEY
 envall set STRIPE_SECRET_KEY
