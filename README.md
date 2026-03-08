@@ -15,15 +15,13 @@ npm install -g env-all
 ### With Claude Code Skill
 
 ```bash
-# Create the skill directory
 mkdir -p ~/.claude/skills/env
-# Copy SKILL.md from this repo to the skill directory
-cp SKILL.md ~/.claude/skills/env/SKILL.md
+cp skill.md ~/.claude/skills/env/SKILL.md
 ```
 
-Then use it by typing `/env` in Claude Code in any project. Claude will install env-all, scan your project for required env vars, and pull them from your global store automatically.
+Then type `/env` in Claude Code in any project. Claude will install env-all, scan your project for required env vars, and pull them from your global store automatically.
 
-### With simple UI
+### With the browser UI
 
 ```bash
 npm install -g env-all
@@ -42,14 +40,13 @@ envall init
 # Add keys from the terminal (hidden input, not saved to shell history)
 envall set OPENAI_API_KEY
 envall set STRIPE_SECRET_KEY
-envall set DATABASE_URL
 
-# In any project directory, pull what you need
+# In any project, pull what you need
 cd ~/my-project
-envall pull OPENAI_API_KEY STRIPE_SECRET_KEY DATABASE_URL
+envall pull OPENAI_API_KEY STRIPE_SECRET_KEY
 ```
 
-Either way, env-all adds `.env` to your `.gitignore` automatically.
+env-all adds `.env` to your `.gitignore` automatically.
 
 ---
 
@@ -196,7 +193,7 @@ env-all is designed so AI coding assistants (Claude Code, Cursor, etc.) can set 
 
 ### Claude Code skill
 
-Copy [`skill.md`](skill.md) to `~/.claude/skills/env/SKILL.md`:
+`envall init` offers to install the skill automatically. To install manually:
 
 ```bash
 mkdir -p ~/.claude/skills/env

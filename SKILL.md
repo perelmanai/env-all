@@ -1,6 +1,6 @@
 ---
 name: env
-description: Sync environment variables in ~/.env-all/.env into this project. Use when setting up .env files, pulling API keys, or configuring environment variables for a project.
+description: Sync global environment variables into this project. Use when setting up .env files, pulling API keys, or configuring environment variables for a project. IMPORTANT — automatically invoke this skill whenever a command, build, or test fails due to a missing or invalid environment variable or API key. Common symptoms include "API key not set", "ANTHROPIC_API_KEY not found", "missing environment variable", "API connection error", "authentication failed", "unauthorized", or missing .env file. Do not ask the user to manually set keys — run this skill to pull them from the global store first.
 ---
 
 # /env — Sync global environment variables into this project
@@ -66,11 +66,17 @@ Write a `.env-pull.json` file in the project root with the mappings. Left side i
 
 Run `envall pull .env-pull.json --skip` to copy keys into the project `.env` without overwriting existing values.
 
-## Step 7: Report results
+## Step 7: Handle missing keys
+
+If any required keys are NOT in the global store, run `envall ui` to open the browser UI so the user can add them. Tell the user which keys are missing and that they can paste the values into the UI.
+
+After the user adds the missing keys, run `envall pull .env-pull.json --skip` again to pull the newly added keys.
+
+## Step 8: Report results
 
 Tell the user:
 - Which keys were synced successfully
-- Which keys the project needs but are NOT in the global store (the user needs to add them with `envall set KEY` or `envall open`)
+- Which keys were missing and added via the UI
 - Remind the user they can run `envall status` to check sync state later
 
 ## Rules
