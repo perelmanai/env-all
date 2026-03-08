@@ -98,6 +98,9 @@ function buildHTML(projectEnvPath, projectExists) {
   .btn-danger:hover { background: var(--danger-bg); border-color: var(--danger); }
   .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
   .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn-update { background: var(--accent); color: #fff; border-color: var(--accent); display: none; }
+  .btn-update:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn-update.visible { display: inline-block; }
   .btn-copied { background: var(--accent); color: #fff; border-color: var(--accent); }
   .add-row { display: flex; gap: 0.35rem; margin-top: 0.6rem; }
   .add-row input { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: 5px; background: var(--bg-surface); color: var(--text); outline: none; transition: border-color 0.15s; min-width: 0; }
@@ -182,9 +185,10 @@ function renderPanel(containerId, keys, side) {
     const id = rk(side, k.key);
     const type = revealing[id] ? 'text' : 'password';
     const eyeLabel = revealing[id] ? 'Hide' : 'Show';
-    html += '<div class="key-row">'
-      + '<input class="key-name" value="' + esc(k.key) + '" readonly>'
-      + '<input class="key-value" type="' + type + '" value="' + esc(k.value) + '" data-side="' + side + '" data-idx="' + i + '" data-field="value">'
+    html += '<div class="key-row" id="row-' + side + '-' + i + '">'
+      + '<input class="key-name" value="' + esc(k.key) + '" data-side="' + side + '" data-idx="' + i + '" data-field="name" data-orig="' + esc(k.key) + '">'
+      + '<input class="key-value" type="' + type + '" value="' + esc(k.value) + '" data-side="' + side + '" data-idx="' + i + '" data-field="value" data-orig="' + esc(k.value) + '">'
+      + '<button class="btn btn-icon btn-update" id="upd-' + side + '-' + i + '" onclick="updateKey(\\'' + side + '\\',' + i + ')">Update</button>'
       + '<button class="btn btn-icon" onclick="copyVal(\\'' + side + '\\',' + i + ')" title="Copy value" id="copy-' + side + '-' + i + '">Copy</button>'
       + '<button class="btn btn-icon" onclick="toggleReveal(\\'' + esc(id) + '\\')">' + eyeLabel + '</button>'
       + '<button class="btn btn-icon btn-danger" onclick="removeKey(\\'' + side + '\\',' + i + ')" title="Delete">Del</button>'
@@ -247,20 +251,42 @@ async function removeKey(side, idx) {
   await load();
 }
 
-// Save on blur for value edits
-document.addEventListener('change', async (e) => {
-  if (e.target.dataset.field === 'value') {
-    const side = e.target.dataset.side;
-    const idx = parseInt(e.target.dataset.idx);
-    const keys = side === 'g' ? globalKeys : projectKeys;
-    const k = keys[idx].key;
-    const v = e.target.value;
-    const endpoint = side === 'g' ? '/api/global' : '/api/project';
-    await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ key: k, value: v }) });
-    toast('Updated ' + k);
-    await load();
-  }
+// Show Update button when name or value is edited
+document.addEventListener('input', (e) => {
+  const field = e.target.dataset.field;
+  if (field !== 'name' && field !== 'value') return;
+  const side = e.target.dataset.side;
+  const idx = e.target.dataset.idx;
+  const row = document.getElementById('row-' + side + '-' + idx);
+  const nameInput = row.querySelector('[data-field="name"]');
+  const valInput = row.querySelector('[data-field="value"]');
+  const dirty = nameInput.value !== nameInput.dataset.orig || valInput.value !== valInput.dataset.orig;
+  const btn = document.getElementById('upd-' + side + '-' + idx);
+  btn.classList.toggle('visible', dirty);
 });
+
+async function updateKey(side, idx) {
+  const row = document.getElementById('row-' + side + '-' + idx);
+  const nameInput = row.querySelector('[data-field="name"]');
+  const valInput = row.querySelector('[data-field="value"]');
+  const origKey = nameInput.dataset.orig;
+  const newKey = nameInput.value.trim();
+  const newVal = valInput.value;
+  if (!newKey) return;
+  const endpoint = side === 'g' ? '/api/global' : '/api/project';
+  const delEndpoint = side === 'g' ? '/api/global/' : '/api/project/';
+  if (newKey !== origKey) {
+    // Rename: delete old, create new
+    await fetch(delEndpoint + encodeURIComponent(origKey), { method: 'DELETE', headers });
+    await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ key: newKey, value: newVal }) });
+    delete revealing[rk(side, origKey)];
+    toast('Renamed ' + origKey + ' → ' + newKey);
+  } else {
+    await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ key: newKey, value: newVal }) });
+    toast('Updated ' + newKey);
+  }
+  await load();
+}
 
 load();
 </script>
