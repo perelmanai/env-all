@@ -1,9 +1,11 @@
 import { createInterface } from 'node:readline';
 import { readFileSync, existsSync, writeFileSync, appendFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { readStore } from '../lib/store.js';
+import { spawnSync } from 'node:child_process';
+import { resolve, dirname, basename } from 'node:path';
+import { readStore, readStoreLiterals, isValidKey, KEY_NAME_RULE } from '../lib/store.js';
 import { regenerateAvailable } from '../lib/available.js';
 import { readProjectEnv, setProjectKey } from '../lib/env-file.js';
+import { maskValue } from '../lib/mask.js';
 import { config } from '../lib/config.js';
 
 function promptConflict(key, localValue, globalValue) {
@@ -14,8 +16,8 @@ function promptConflict(key, localValue, globalValue) {
     });
 
     console.log(`\nConflict: ${key}`);
-    console.log(`  Local:  ${localValue}`);
-    console.log(`  Global: ${globalValue}`);
+    console.log(`  Local:  ${maskValue(localValue)}`);
+    console.log(`  Global: ${maskValue(globalValue)}`);
     rl.question('  [s]kip / [o]verwrite / [S]kip all / [O]verwrite all: ', (answer) => {
       rl.close();
       resolve(answer.trim());
@@ -88,24 +90,42 @@ function parsePullJson(filePath) {
 }
 
 /**
- * Ensure .env is listed in the nearest .gitignore.
+ * Exit code of a git command run in `dir`, or null when git is not available.
+ */
+function gitExitCode(dir, args) {
+  const result = spawnSync('git', args, { cwd: dir, stdio: 'ignore' });
+  return result.error ? null : result.status;
+}
+
+/**
+ * Ensure the target env file is ignored by git.
  * Checks the directory containing the target env file.
  */
 function ensureGitignore(envFilePath) {
   const dir = dirname(envFilePath);
+  const name = basename(envFilePath);
   const gitignorePath = resolve(dir, '.gitignore');
+
+  // An ignore rule does nothing for a file git already tracks
+  if (gitExitCode(dir, ['ls-files', '--error-unmatch', '--', name]) === 0) {
+    console.warn(`  Warning: ${name} is tracked by git, so .gitignore does not protect it.`);
+    console.warn(`  Run: git rm --cached ${name}`);
+  }
+
+  // Already covered by an ignore rule anywhere up the tree (e.g. ".env*")
+  if (gitExitCode(dir, ['check-ignore', '-q', '--no-index', '--', name]) === 0) return;
 
   if (existsSync(gitignorePath)) {
     const content = readFileSync(gitignorePath, 'utf-8');
     const lines = content.split('\n').map((l) => l.trim());
-    if (lines.includes('.env')) return;
-    // .env not in gitignore — append it
+    if (lines.includes(name)) return;
+    // Not in gitignore — append it
     const separator = content.endsWith('\n') ? '' : '\n';
-    appendFileSync(gitignorePath, `${separator}.env\n`, 'utf-8');
-    console.log('  Added .env to .gitignore');
+    appendFileSync(gitignorePath, `${separator}${name}\n`, 'utf-8');
+    console.log(`  Added ${name} to .gitignore`);
   } else {
-    writeFileSync(gitignorePath, '.env\n', 'utf-8');
-    console.log('  Created .gitignore with .env');
+    writeFileSync(gitignorePath, `${name}\n`, 'utf-8');
+    console.log(`  Created .gitignore with ${name}`);
   }
 }
 
@@ -154,6 +174,7 @@ export async function pullCommand(keySpecs, options) {
   regenerateAvailable(profile);
 
   const store = readStore(profile);
+  const literals = readStoreLiterals(profile); // values as written after KEY=, quoting included
 
   // Determine key specs from arguments
   let specs;
@@ -185,7 +206,14 @@ export async function pullCommand(keySpecs, options) {
     specs = keySpecs.map(parseKeySpec);
   }
 
-  // Ensure .env is in .gitignore before writing any keys
+  const invalid = specs.map(({ localKey }) => localKey).filter((key) => !isValidKey(key));
+  if (invalid.length) {
+    console.error(`Invalid key name: ${invalid.join(', ')}`);
+    console.error(KEY_NAME_RULE);
+    process.exit(1);
+  }
+
+  // Ensure the env file is ignored by git before writing any keys
   ensureGitignore(envFile);
 
   const projectEnv = existsSync(envFile) ? readProjectEnv(envFile) : new Map();
@@ -211,7 +239,7 @@ export async function pullCommand(keySpecs, options) {
 
     // Key doesn't exist locally — just add it
     if (localValue === undefined) {
-      setProjectKey(envFile, localKey, globalValue);
+      setProjectKey(envFile, localKey, globalValue, literals.get(globalKey));
       projectEnv.set(localKey, globalValue); // update in-memory for subsequent iterations
       added++;
       console.log(`  + ${localKey}`);
@@ -231,10 +259,17 @@ export async function pullCommand(keySpecs, options) {
     }
 
     if (conflictPolicy === 'overwrite') {
-      setProjectKey(envFile, localKey, globalValue);
+      setProjectKey(envFile, localKey, globalValue, literals.get(globalKey));
       projectEnv.set(localKey, globalValue);
       overwritten++;
       console.log(`  ~ ${localKey} (overwritten)`);
+      continue;
+    }
+
+    // Nobody to answer a prompt (piped stdin, CI, AI agents) — keep the local value
+    if (!process.stdin.isTTY) {
+      skipped++;
+      console.log(`  ! ${localKey} kept (differs from global). Use --overwrite to replace it.`);
       continue;
     }
 
@@ -243,13 +278,13 @@ export async function pullCommand(keySpecs, options) {
 
     switch (answer) {
       case 'o':
-        setProjectKey(envFile, localKey, globalValue);
+        setProjectKey(envFile, localKey, globalValue, literals.get(globalKey));
         projectEnv.set(localKey, globalValue);
         overwritten++;
         console.log(`  ~ ${localKey} (overwritten)`);
         break;
       case 'O':
-        setProjectKey(envFile, localKey, globalValue);
+        setProjectKey(envFile, localKey, globalValue, literals.get(globalKey));
         projectEnv.set(localKey, globalValue);
         overwritten++;
         conflictPolicy = 'overwrite';

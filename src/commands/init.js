@@ -1,9 +1,10 @@
-import { mkdirSync, existsSync, writeFileSync, chmodSync, copyFileSync, readFileSync } from 'node:fs';
+import { mkdirSync, existsSync, chmodSync, copyFileSync, readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
 import { homedir } from 'node:os';
 import { config } from '../lib/config.js';
+import { writeStoreFile } from '../lib/store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -18,7 +19,7 @@ function prompt(question) {
 }
 
 function installSkill() {
-  const skillSrc = join(__dirname, '..', '..', 'skill.md');
+  const skillSrc = join(__dirname, '..', '..', 'SKILL.md');
   const skillDir = join(homedir(), '.claude', 'skills', 'env');
   const skillDest = join(skillDir, 'SKILL.md');
 
@@ -38,14 +39,24 @@ export async function initCommand() {
   // Set up global store
   if (existsSync(config.dir)) {
     console.log(`Already initialized: ${config.dir}`);
+    // Stores created by older versions: make the directory and every store file owner-only
+    chmodSync(config.dir, 0o700);
+    for (const name of readdirSync(config.dir)) {
+      if (name.startsWith('.env')) chmodSync(join(config.dir, name), 0o600);
+    }
   } else {
-    mkdirSync(config.dir, { recursive: true });
-    writeFileSync(config.envFile, '', 'utf-8');
-    chmodSync(config.envFile, 0o600);
-    writeFileSync(config.availableFile, '', 'utf-8');
+    mkdirSync(config.dir, { recursive: true, mode: 0o700 });
+    writeStoreFile(config.envFile, '');
+    writeStoreFile(config.availableFile, '');
 
     console.log(`Created ${config.dir}`);
     console.log(`Global env file: ${config.envFile}`);
+  }
+
+  // Keep the store out of any git repo that contains it (dotfiles repos, a home directory under git)
+  const storeGitignore = join(config.dir, '.gitignore');
+  if (!existsSync(storeGitignore)) {
+    writeStoreFile(storeGitignore, '*\n');
   }
 
   // Check for Claude Code skill

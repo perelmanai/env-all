@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { initCommand } from '../src/commands/init.js';
 import { setCommand } from '../src/commands/set.js';
@@ -11,12 +12,14 @@ import { pullCommand } from '../src/commands/pull.js';
 import { statusCommand } from '../src/commands/status.js';
 import { uiCommand } from '../src/commands/ui.js';
 
+const { version } = createRequire(import.meta.url)('../package.json');
+
 const program = new Command();
 
 program
   .name('envall')
   .description('Cross-project environment variable manager')
-  .version('0.1.0');
+  .version(version);
 
 program
   .command('init')
@@ -79,6 +82,7 @@ program
   .description('Open a browser-based UI to manage keys')
   .option('-e, --env <file>', 'Project env file (default: ./.env)')
   .option('-p, --profile <name>', 'Use a named profile')
+  .option('--no-private', 'Open in your default browser instead of a private window')
   .action(uiCommand);
 
 program.parse();

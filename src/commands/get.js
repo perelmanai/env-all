@@ -1,13 +1,7 @@
 import { existsSync } from 'node:fs';
 import { getKey } from '../lib/store.js';
 import { config } from '../lib/config.js';
-
-function maskValue(value) {
-  if (value.length <= 4) return '****';
-  const start = value.slice(0, 2);
-  const end = value.slice(-3);
-  return `${start}...${end}`;
-}
+import { maskValue } from '../lib/mask.js';
 
 export function getCommand(key, options) {
   if (!existsSync(config.dir)) {

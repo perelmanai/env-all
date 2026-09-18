@@ -1,9 +1,8 @@
 import { createServer } from 'node:http';
-import { execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { platform } from 'node:os';
 import { randomBytes } from 'node:crypto';
+import { openPrivateWindow, openDefaultBrowser } from '../lib/browser.js';
 import { readStore, setKey, removeKey } from '../lib/store.js';
 import { regenerateAvailable } from '../lib/available.js';
 import { readProjectEnv, setProjectKey } from '../lib/env-file.js';
@@ -162,11 +161,11 @@ async function load() {
   render();
 }
 
-function toast(msg) {
+function toast(msg, ms = 1800) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 1800);
+  setTimeout(() => el.classList.remove('show'), ms);
 }
 
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
@@ -185,12 +184,13 @@ function renderPanel(containerId, keys, side) {
     const id = rk(side, k.key);
     const type = revealing[id] ? 'text' : 'password';
     const eyeLabel = revealing[id] ? 'Hide' : 'Show';
+    const shown = k.value.replace(/[\\r\\n]/g, ''); // a text input drops line breaks
     html += '<div class="key-row" id="row-' + side + '-' + i + '">'
       + '<input class="key-name" value="' + esc(k.key) + '" data-side="' + side + '" data-idx="' + i + '" data-field="name" data-orig="' + esc(k.key) + '">'
-      + '<input class="key-value" type="' + type + '" value="' + esc(k.value) + '" data-side="' + side + '" data-idx="' + i + '" data-field="value" data-orig="' + esc(k.value) + '">'
+      + '<input class="key-value" type="' + type + '" value="' + esc(shown) + '" data-side="' + side + '" data-idx="' + i + '" data-field="value" data-orig="' + esc(shown) + '">'
       + '<button class="btn btn-icon btn-update" id="upd-' + side + '-' + i + '" onclick="updateKey(\\'' + side + '\\',' + i + ')">Update</button>'
       + '<button class="btn btn-icon" onclick="copyVal(\\'' + side + '\\',' + i + ')" title="Copy value" id="copy-' + side + '-' + i + '">Copy</button>'
-      + '<button class="btn btn-icon" onclick="toggleReveal(\\'' + esc(id) + '\\')">' + eyeLabel + '</button>'
+      + '<button class="btn btn-icon" data-id="' + esc(id) + '" onclick="toggleReveal(this.dataset.id)">' + eyeLabel + '</button>'
       + '<button class="btn btn-icon btn-danger" onclick="removeKey(\\'' + side + '\\',' + i + ')" title="Delete">Del</button>'
       + '</div>';
   }
@@ -218,11 +218,17 @@ async function copyVal(side, idx) {
   setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('btn-copied'); }, 1500);
 }
 
+async function save(endpoint, key, value) {
+  const res = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ key, value }) });
+  if (!res.ok) toast((await res.json()).error, 5000);
+  return res.ok;
+}
+
 async function addGlobal() {
   const key = document.getElementById('g-new-key').value.trim();
   const value = document.getElementById('g-new-value').value;
   if (!key) return;
-  await fetch('/api/global', { method: 'POST', headers, body: JSON.stringify({ key, value }) });
+  if (!(await save('/api/global', key, value))) return;
   document.getElementById('g-new-key').value = '';
   document.getElementById('g-new-value').value = '';
   toast('Added ' + key);
@@ -233,7 +239,7 @@ async function addProject() {
   const key = document.getElementById('p-new-key').value.trim();
   const value = document.getElementById('p-new-value').value;
   if (!key) return;
-  await fetch('/api/project', { method: 'POST', headers, body: JSON.stringify({ key, value }) });
+  if (!(await save('/api/project', key, value))) return;
   document.getElementById('p-new-key').value = '';
   document.getElementById('p-new-value').value = '';
   toast('Added ' + key);
@@ -271,18 +277,20 @@ async function updateKey(side, idx) {
   const valInput = row.querySelector('[data-field="value"]');
   const origKey = nameInput.dataset.orig;
   const newKey = nameInput.value.trim();
-  const newVal = valInput.value;
+  const keys = side === 'g' ? globalKeys : projectKeys;
+  // An untouched field may be showing a multi-line value on one line: send the stored value
+  const newVal = valInput.value === valInput.dataset.orig ? keys[idx].value : valInput.value;
   if (!newKey) return;
   const endpoint = side === 'g' ? '/api/global' : '/api/project';
   const delEndpoint = side === 'g' ? '/api/global/' : '/api/project/';
   if (newKey !== origKey) {
-    // Rename: delete old, create new
+    // Rename: create new, then delete old
+    if (!(await save(endpoint, newKey, newVal))) return;
     await fetch(delEndpoint + encodeURIComponent(origKey), { method: 'DELETE', headers });
-    await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ key: newKey, value: newVal }) });
     delete revealing[rk(side, origKey)];
     toast('Renamed ' + origKey + ' → ' + newKey);
   } else {
-    await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ key: newKey, value: newVal }) });
+    if (!(await save(endpoint, newKey, newVal))) return;
     toast('Updated ' + newKey);
   }
   await load();
@@ -390,14 +398,13 @@ export function uiCommand(options) {
     console.log(`Project env:  ${projectEnvPath}`);
     console.log('Press Ctrl+C to stop.\n');
 
-    try {
-      if (platform() === 'darwin') {
-        execSync(`open "${url}"`);
-      } else if (platform() === 'linux') {
-        execSync(`xdg-open "${url}"`);
-      }
-    } catch {
-      // Browser open failed, user can copy the URL
+    // A private window keeps browser extensions away from the keys on the page
+    const privateBrowser = options.private ? openPrivateWindow(url) : null;
+    if (privateBrowser) {
+      console.log(`Opened in a private ${privateBrowser} window.`);
+    } else if (openDefaultBrowser(url) && options.private) {
+      console.log('Opened in your default browser. For a private window, install Chrome, Edge or Brave.');
     }
+    // If nothing opened, the user can copy the URL above
   });
 }

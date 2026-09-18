@@ -1,6 +1,6 @@
 import { createInterface } from 'node:readline';
 import { existsSync } from 'node:fs';
-import { setKey } from '../lib/store.js';
+import { setKey, isValidKey, KEY_NAME_RULE } from '../lib/store.js';
 import { regenerateAvailable } from '../lib/available.js';
 import { config } from '../lib/config.js';
 
@@ -46,21 +46,26 @@ export async function setCommand(keyValue, options) {
   }
 
   const profile = options.profile || undefined;
-  let key, value;
-
-  if (keyValue.includes('=')) {
-    const eqIndex = keyValue.indexOf('=');
-    key = keyValue.slice(0, eqIndex);
-    value = keyValue.slice(eqIndex + 1);
-    console.warn('Warning: value may be saved in shell history. Use "envall set KEY" (without =) for hidden input.');
-  } else {
-    key = keyValue;
-    value = await promptHidden(`Enter value for ${key}: `);
-  }
+  const eqIndex = keyValue.indexOf('=');
+  const key = eqIndex === -1 ? keyValue : keyValue.slice(0, eqIndex);
 
   if (!key) {
     console.error('Key name cannot be empty.');
     process.exit(1);
+  }
+
+  if (!isValidKey(key)) {
+    console.error(`Invalid key name: ${key}`);
+    console.error(KEY_NAME_RULE);
+    process.exit(1);
+  }
+
+  let value;
+  if (eqIndex !== -1) {
+    value = keyValue.slice(eqIndex + 1);
+    console.warn('Warning: value may be saved in shell history. Use "envall set KEY" (without =) for hidden input.');
+  } else {
+    value = await promptHidden(`Enter value for ${key}: `);
   }
 
   setKey(key, value, profile);
