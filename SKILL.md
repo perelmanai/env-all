@@ -42,11 +42,19 @@ Compare the keys the project needs to the available global keys. Handle naming d
 | SvelteKit | `PUBLIC_` | `PUBLIC_API_KEY` |
 
 Also handle common naming variations:
-- `DATABASE_URL` vs `DB_URL` vs `POSTGRES_URL`
 - `OPENAI_API_KEY` vs `OPENAI_KEY`
 - `STRIPE_SECRET_KEY` vs `STRIPE_API_KEY` vs `STRIPE_KEY`
 
-**One-to-many**: A single global key can map to multiple project keys. For example, global `OPENAI_API_KEY` might be needed as both `OPENAI_API_KEY` (server) and `NEXT_PUBLIC_OPENAI_API_KEY` (client) in the same project.
+**Project-specific keys stay out.** The global store is for account-level credentials that are the same in every project (LLM provider keys, third-party API keys). Do not map a key whose value belongs to one project, even when a key with that name exists in the global store:
+- URLs, hosts and connection strings: `DATABASE_URL`, `REDIS_URL`, `SUPABASE_URL`, `NEXT_PUBLIC_APP_URL`, anything ending in `_URL`, `_URI`, `_HOST` or `_ENDPOINT`
+- Keys issued per project or per app: Supabase and Firebase project keys, webhook signing secrets, OAuth client IDs and secrets
+- Secrets generated for one app: `NEXTAUTH_SECRET`, `JWT_SECRET`, `SESSION_SECRET`
+
+Leave these out of `.env-pull.json`. The user sets them in this project's `.env`. When unsure whether a key is project-specific, ask the user before mapping it.
+
+**One-to-many**: A single global key can map to multiple project keys. For example, global `STRIPE_PUBLISHABLE_KEY` might be needed as both `STRIPE_PUBLISHABLE_KEY` (server) and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (client) in the same project.
+
+**Public prefixes expose the value.** `VITE_`, `NEXT_PUBLIC_`, `REACT_APP_`, `NUXT_PUBLIC_`, `EXPO_PUBLIC_` and `PUBLIC_` put the value into the JavaScript every visitor downloads. When the code asks for a public-prefixed name, map it so the project runs, and note every case where the global key is a secret (anything other than a publishable or anon key) so you can report it in Step 8.
 
 ## Step 5: Write .env-pull.json
 
@@ -56,8 +64,8 @@ Write a `.env-pull.json` file in the project root with the mappings. Left side i
 {
   "mappings": {
     "OPENAI_API_KEY": "OPENAI_API_KEY",
-    "NEXT_PUBLIC_OPENAI_API_KEY": "OPENAI_API_KEY",
-    "DATABASE_URL": "DATABASE_URL"
+    "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY": "STRIPE_PUBLISHABLE_KEY",
+    "ANTHROPIC_API_KEY": "ANTHROPIC_API_KEY"
   }
 }
 ```
@@ -68,15 +76,17 @@ Run `envall pull .env-pull.json --skip` to copy keys into the project `.env` wit
 
 ## Step 7: Handle missing keys
 
-If any required keys are NOT in the global store, run `envall ui` to open the browser UI so the user can add them. Tell the user which keys are missing and that they can paste the values into the UI.
+If any required keys are NOT in the global store, run `envall ui` **in the background** to open the browser UI so the user can add them. It is a server that keeps running until stopped, so a foreground call never returns. Tell the user which keys are missing and that they can paste the values into the UI, and ask them to reply when they are done. Project-specific values (Step 4) go in the Project panel of the same UI, not the Global Store panel.
 
-After the user adds the missing keys, run `envall pull .env-pull.json --skip` again to pull the newly added keys.
+After the user confirms, stop the background `envall ui` process, then run `envall pull .env-pull.json --skip` again to pull the newly added keys.
 
 ## Step 8: Report results
 
 Tell the user:
 - Which keys were synced successfully
 - Which keys were missing and added via the UI
+- Which project-specific keys were left out, for the user to set in this project's `.env`
+- Which secret keys were mapped to a public-prefixed name (`VITE_`, `NEXT_PUBLIC_`, ...): tell the user the value is readable by anyone who opens the app in a browser, and that a deployed app should keep the key unprefixed and call the provider from a server route
 - Remind the user they can run `envall status` to check sync state later
 
 ## Rules

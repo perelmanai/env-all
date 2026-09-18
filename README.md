@@ -16,7 +16,7 @@ npm install -g env-all
 
 ```bash
 mkdir -p ~/.claude/skills/env
-cp skill.md ~/.claude/skills/env/SKILL.md
+cp SKILL.md ~/.claude/skills/env/SKILL.md
 ```
 
 Then type `/env` in Claude Code in any project. Claude will install env-all, scan your project for required env vars, and pull them from your global store automatically.
@@ -46,14 +46,14 @@ cd ~/my-project
 envall pull OPENAI_API_KEY STRIPE_SECRET_KEY
 ```
 
-env-all adds `.env` to your `.gitignore` automatically.
+env-all adds the env file it writes to your `.gitignore` automatically.
 
 ---
 
 ## Why
 
 - **One source of truth.** Stop maintaining the same keys across 15 projects.
-- **Rename on pull.** `envall pull OPENAI_API_KEY:VITE_OPENAI_API_KEY` handles framework prefixes.
+- **Rename on pull.** `envall pull STRIPE_PUBLISHABLE_KEY:VITE_STRIPE_PUBLISHABLE_KEY` handles framework prefixes.
 - **AI-friendly.** AI coding assistants can scan your project, generate a `.env-pull.json` mapping, and pull keys automatically -- without ever seeing the actual values.
 - **Zero dependencies.** Just `commander` for CLI parsing. No runtime overhead in your projects.
 - **Browser UI.** `envall ui` opens a split-screen editor showing your global keys alongside the current project's `.env`.
@@ -86,7 +86,7 @@ All commands support `--profile <name>` for multiple environments (dev, staging,
 ### Basic
 
 ```bash
-envall pull OPENAI_API_KEY DATABASE_URL
+envall pull OPENAI_API_KEY ANTHROPIC_API_KEY
 ```
 
 ### Rename on pull
@@ -94,15 +94,17 @@ envall pull OPENAI_API_KEY DATABASE_URL
 When your framework needs a prefix:
 
 ```bash
-envall pull OPENAI_API_KEY:VITE_OPENAI_API_KEY
-envall pull OPENAI_API_KEY:NEXT_PUBLIC_OPENAI_API_KEY
+envall pull STRIPE_PUBLISHABLE_KEY:VITE_STRIPE_PUBLISHABLE_KEY
+envall pull STRIPE_PUBLISHABLE_KEY:NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 ```
 
 The same global key can map to multiple project keys:
 
 ```bash
-envall pull OPENAI_API_KEY OPENAI_API_KEY:VITE_OPENAI_API_KEY
+envall pull STRIPE_PUBLISHABLE_KEY STRIPE_PUBLISHABLE_KEY:VITE_STRIPE_PUBLISHABLE_KEY
 ```
+
+Prefixes such as `VITE_`, `NEXT_PUBLIC_`, `REACT_APP_` and `EXPO_PUBLIC_` put the value into the JavaScript every visitor downloads. Use them for publishable keys. Keep secret keys unprefixed and call the provider from your server. The Claude Code skill tells you when it maps a secret key to a public-prefixed name.
 
 ### Pull from a JSON mapping file
 
@@ -112,9 +114,9 @@ For projects with many keys or framework-specific prefixes, define a `.env-pull.
 {
   "mappings": {
     "OPENAI_API_KEY": "OPENAI_API_KEY",
-    "VITE_OPENAI_API_KEY": "OPENAI_API_KEY",
-    "NEXT_PUBLIC_STRIPE_KEY": "STRIPE_SECRET_KEY",
-    "DATABASE_URL": "DATABASE_URL"
+    "STRIPE_SECRET_KEY": "STRIPE_SECRET_KEY",
+    "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY": "STRIPE_PUBLISHABLE_KEY",
+    "ANTHROPIC_API_KEY": "ANTHROPIC_API_KEY"
   }
 }
 ```
@@ -140,16 +142,20 @@ The agent never sees your secrets. See the [AI Assistant Integration](#ai-assist
 
 ### Conflict handling
 
-When a key already exists in your project `.env` with a different value, env-all prompts you:
+When a key already exists in your project `.env` with a different value, env-all prompts you. Values are masked:
 
 ```
 Conflict: OPENAI_API_KEY
-  Local:  sk-old...
-  Global: sk-new...
+  Local:  sk...old
+  Global: sk...new
   [s]kip / [o]verwrite / [S]kip all / [O]verwrite all:
 ```
 
-Or skip the prompt with `--overwrite` or `--skip`.
+Or skip the prompt with `--overwrite` or `--skip`. Outside an interactive terminal (scripts, CI, AI assistants), conflicts keep the local value; pass `--overwrite` to replace it.
+
+### Quoting
+
+Values containing `#` or whitespace are written in quotes, so your project reads the full value. Values you quoted yourself in the global store keep their quoting when pulled, including quoted values that span several lines (PEM keys, JSON).
 
 ---
 
@@ -177,6 +183,8 @@ envall ui
 
 Opens a split-screen editor in your browser with your global store on the left and the current project's `.env` on the right. Copy values to clipboard and paste where needed -- the same flow as copying keys from an API provider dashboard.
 
+The UI opens in a private window (Chrome, Edge or Brave; also Firefox on Linux), where browser extensions are off by default. Your default browser is used when it is one of these. Pass `--no-private` to open a regular window in your default browser.
+
 ---
 
 ## AI Assistant Integration
@@ -191,13 +199,15 @@ env-all is designed so AI coding assistants (Claude Code, Cursor, etc.) can set 
 4. The AI writes a `.env-pull.json` mapping and runs `envall pull .env-pull.json`.
 5. The AI never sees `~/.env-global/.env` or any actual values.
 
+The global store is for credentials you reuse across projects. The Claude Code skill leaves project-specific values (database URLs, per-project keys, app secrets) out of the mapping; you set those in the project's `.env`.
+
 ### Claude Code skill
 
 `envall init` offers to install the skill automatically. To install manually:
 
 ```bash
 mkdir -p ~/.claude/skills/env
-cp skill.md ~/.claude/skills/env/SKILL.md
+cp SKILL.md ~/.claude/skills/env/SKILL.md
 ```
 
 Then run `/env` in any project to have Claude scan your code, generate a `.env-pull.json` mapping, and pull keys automatically.
@@ -210,7 +220,7 @@ Every time you modify the store (`set`, `rm`, `open`), env-all regenerates `~/.e
 ```
 OPENAI_API_KEY
 STRIPE_SECRET_KEY
-DATABASE_URL
+ANTHROPIC_API_KEY
 ```
 
 No values. This file is safe for AI assistants to read.
@@ -222,15 +232,17 @@ It's also regenerated at the start of `pull` and `status`, so manual edits to `~
 <details>
 <summary><strong>Security</strong></summary>
 
-- `~/.env-global/.env` is created with `chmod 600` (owner read/write only).
+- `~/.env-global/` is `chmod 700` and every file in it, profiles included, is `chmod 600` (owner only). Run `envall init` once to apply this to a store created by an older version.
 - `envall set KEY` prompts for hidden input -- the value never appears in shell history.
 - `envall set KEY=VALUE` warns you about shell history exposure.
 - `envall get` shows masked values by default. `--unmask` is required for raw output.
 - `envall list` always masks values.
-- `envall pull` output only shows key names, never values.
-- `envall ui` binds to `127.0.0.1` only, with a one-time auth token in the URL.
+- `envall pull` output shows key names. Conflict prompts show masked values, and only in an interactive terminal.
+- `envall ui` binds to `127.0.0.1` only, with a one-time auth token in the URL, and opens in a private browser window so extensions cannot read the page.
 - Profile names are validated to prevent path traversal.
-- `.env` is added to `.gitignore` automatically on pull.
+- Key names use letters, digits and underscores. Any other line in a `.env` file is ignored, so only key names reach `.env.available`.
+- The env file you pull into (`.env`, or the `--env` target) is added to `.gitignore` automatically. If git already tracks that file, pull warns you and prints the command to untrack it.
+- `~/.env-global/` contains a `.gitignore` of `*`, so a dotfiles repo or a home directory under git never picks it up.
 
 env-all stores keys unencrypted, the same as any `.env` file. It is designed for local development, not production secret management.
 
